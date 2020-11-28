@@ -1,3 +1,7 @@
+"""
+Modified version of https://github.com/brettpilch/pygame-checkers
+"""
+
 import pygame
 import math
 import random
