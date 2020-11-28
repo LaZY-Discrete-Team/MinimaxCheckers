@@ -142,21 +142,11 @@ class Game:
 		"""
 		Draw the game board and the X's and O's.
 		"""
-		# for i in range(9):
-		# 	pygame.draw.line(screen, WHITE, [i * WIDTH / 8, 0], [i * WIDTH / 8, HEIGHT], 5)
-		# 	pygame.draw.line(screen, WHITE, [0, i * HEIGHT / 8], [WIDTH, i * HEIGHT / 8], 5)
 
 		for i in range(ROWS+1):
 			for j in range(COLS+1):
 				if (i+j) % 2 == 1: # flip color of board
 					pygame.draw.rect(screen, WHITE, (i * WIDTH / ROWS, j * HEIGHT / COLS, WIDTH / ROWS, HEIGHT / COLS))
-
-		# for i in range(ROWS+1):
-		# 	for j in range(COLS+1):
-		# 		if (j > 4) & (i+j) % 2 == 1: # place red checkers
-		# 			pygame.draw.circle(screen, RED, ((i+0.5) * WIDTH / ROWS, (j+0.5) * HEIGHT / COLS), WIDTH / ROWS / 2)
-		# 		elif (j < 3) & (i+j) % 2 == 1: # place blue checkers
-		# 			pygame.draw.circle(screen, BLUE, ((i+0.5) * WIDTH / ROWS, (j+0.5) * HEIGHT / COLS), WIDTH / ROWS / 2)
 
 		font = pygame.font.SysFont('Calibri', MARK_SIZE, False, False)
 		for r in range(len(self.game_board)):
