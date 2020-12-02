@@ -108,7 +108,7 @@ class Game:
 					ind.append([i, j])
 		moves = []
 		for i in ind: # todo fix this inefficiency of checking king jumps
-			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1]]: #,[2,2],[2,-2],[-2,2],[-2,-2]]:
+			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1],[2,2],[2,-2],[-2,2],[-2,-2]]:
 					if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
 						if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
 							ivm = self.is_valid_move(player, i, [i[0]+p, i[1]+q])
@@ -207,21 +207,17 @@ def get_clicked_row(mouse_pos):
 
 def minimax(game, depth, pl):
 	player = game.players[game.turn % 2]
-
-	speed = 10
-	# timeout = .01
-
+	speed = 50
 	if (depth == 0) | (game.check_winner() != None):
 		your_pieces = game.tokens[pl]
 		their_pieces = game.tokens[(pl+1)%2]
 
-		if game.tokens != [12,12]:
-			print("minimax", depth, player, game.tokens)
-		# screen.fill(BLACK)
-		# game.draw()
-		# pygame.display.flip()
-		# clock.tick(speed)
-		# # time.sleep(timeout)
+		# if game.tokens != [12,12]:
+		# print("minimax", depth, player, game.tokens)
+		screen.fill(BLACK)
+		game.draw()
+		pygame.display.flip()
+		clock.tick(speed)
 		return your_pieces/their_pieces, []
 	elif player == game.players[pl]:
 		value = -1
@@ -234,12 +230,11 @@ def minimax(game, depth, pl):
 			value = max(value, minimaxer[0])
 			if value == minimaxer[0]:
 				best_move.append(move)
-		# # print("minimax", depth, player, game.tokens)
-		# screen.fill(BLACK)
-		# game.draw()
-		# pygame.display.flip()
-		# clock.tick(speed)
-		# # time.sleep(timeout)
+		# print("minimax", depth, player, game.tokens)
+		screen.fill(BLACK)
+		game.draw()
+		pygame.display.flip()
+		clock.tick(speed)
 		return value, best_move
 	else: # (* minimizing player *)
 		value = 13
@@ -252,12 +247,11 @@ def minimax(game, depth, pl):
 			value = min(value, minimaxer[0])
 			if value == minimaxer[0]:
 				best_move.append(move)
-		# # print("minimax", depth, player, game.tokens)
-		# screen.fill(BLACK)
-		# game.draw()
-		# pygame.display.flip()
-		# clock.tick(speed)
-		# # time.sleep(timeout)
+		# print("minimax", depth, player, game.tokens)
+		screen.fill(BLACK)
+		game.draw()
+		pygame.display.flip()
+		clock.tick(speed)
 		return value, best_move
 
 
@@ -306,21 +300,16 @@ def minimax(game, depth, pl):
 # # If you forget this line, the program will 'hang' on exit if running from IDLE.
 # pygame.quit()
 
-# game = Game()
-# for mp in [0]:
-# 	for depth in [2,3,4,5,6]:
-# 		minimaxval, best_move = minimax(game, depth, mp)
-# 		print("minimaxval", (mp == game.turn % 2), depth, minimaxval, best_move)
 
 pygame.init()
 size = (WIDTH, HEIGHT)
 screen = pygame.display.set_mode(size)
 game = Game()
 clock = pygame.time.Clock()
-for mp in [0]:
-	for depth in [5]:
-		minimaxval = minimax(game, depth, mp)
-		print("minimaxval", (mp == game.turn % 2), depth, minimaxval)
+for maximizingPlayerIndex in [0]:
+	for depth in [3]:
+		ratio, best_moves = minimax(game, depth, maximizingPlayerIndex)
+		print("minimaxval", (maximizingPlayerIndex == game.turn % 2), depth, ratio, best_moves)
 	# screen.fill(BLACK)
 	# game.draw()
 	# pygame.display.flip()
