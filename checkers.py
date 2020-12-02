@@ -107,7 +107,7 @@ class Game:
 				if y == player:
 					ind.append([i, j])
 		moves = []
-		for i in ind: # todo fix this inefficiency of checking king jumps
+		for i in ind: # todo: fix this inefficiency of checking king moves too
 			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1],[2,2],[2,-2],[-2,2],[-2,-2]]:
 					if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
 						if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
@@ -141,7 +141,6 @@ class Game:
 			self.selected_token = None
 			self.next_turn()
 		winner = self.check_winner()
-		# print(self.tokens)
 		if winner != None:
 			self.status = 'game over'
 		return winner
@@ -205,19 +204,20 @@ def get_clicked_row(mouse_pos):
 			return i - 1
 	return COLS-1
 
-def minimax(game, depth, pl):
+def minimax(game, depth, pl, framerate=None):
 	player = game.players[game.turn % 2]
-	speed = 50
 	if (depth == 0) | (game.check_winner() != None):
 		your_pieces = game.tokens[pl]
 		their_pieces = game.tokens[(pl+1)%2]
 
 		# if game.tokens != [12,12]:
 		# print("minimax", depth, player, game.tokens)
-		screen.fill(BLACK)
-		game.draw()
-		pygame.display.flip()
-		clock.tick(speed)
+
+		if framerate != None:
+			screen.fill(BLACK)
+			game.draw()
+			pygame.display.flip()
+			clock.tick(framerate)
 		return your_pieces/their_pieces, []
 	elif player == game.players[pl]:
 		value = -1
@@ -226,15 +226,16 @@ def minimax(game, depth, pl):
 		for move in moves:
 			new_game = copy.deepcopy(game)
 			new_game.play(player, move[0], move[1], move[2])
-			minimaxer = minimax(new_game, depth-1, pl)
+			minimaxer = minimax(new_game, depth-1, pl, framerate=framerate)
 			value = max(value, minimaxer[0])
 			if value == minimaxer[0]:
 				best_move.append(move)
 		# print("minimax", depth, player, game.tokens)
-		screen.fill(BLACK)
-		game.draw()
-		pygame.display.flip()
-		clock.tick(speed)
+		if framerate != None:
+			screen.fill(BLACK)
+			game.draw()
+			pygame.display.flip()
+			clock.tick(framerate)
 		return value, best_move
 	else: # (* minimizing player *)
 		value = 13
@@ -243,75 +244,74 @@ def minimax(game, depth, pl):
 		for move in moves:
 			new_game = copy.deepcopy(game)
 			new_game.play(player, move[0], move[1], move[2])
-			minimaxer = minimax(new_game, depth-1, pl)
+			minimaxer = minimax(new_game, depth-1, pl, framerate=framerate)
 			value = min(value, minimaxer[0])
 			if value == minimaxer[0]:
 				best_move.append(move)
 		# print("minimax", depth, player, game.tokens)
-		screen.fill(BLACK)
-		game.draw()
-		pygame.display.flip()
-		clock.tick(speed)
+		if framerate != None:
+			screen.fill(BLACK)
+			game.draw()
+			pygame.display.flip()
+			clock.tick(framerate)
 		return value, best_move
 
+run_minimax = True
 
-# # start pygame:
-# pygame.init()
-# size = (WIDTH, HEIGHT)
-# screen = pygame.display.set_mode(size)
-#
-# # start game:
-# game = Game()
-#
-# # Loop until the user clicks the close button.
-# done = False
-#
-# # Used to manage how fast the screen updates
-# clock = pygame.time.Clock()
-#
-# # game loop:
-# while not done:
-# 	 # --- Main event loop
-# 	 for event in pygame.event.get(): # User did something
-# 		 if event.type == pygame.QUIT: # If user clicked close
-# 			 done = True # Flag that we are done so we exit this loop
-# 		 if event.type == pygame.KEYDOWN:
-# 			 entry = str(event.key)
-# 		 if event.type == pygame.MOUSEBUTTONDOWN:
-# 			 mouse_x, mouse_y = pygame.mouse.get_pos()
-# 			 game.evaluate_click(pygame.mouse.get_pos())
-#
-# 	 # --- Drawing code should go here
-#
-# 	 # First, clear the screen to black. Don't put other drawing commands
-# 	 # above this, or they will be erased with this command.
-# 	 screen.fill(BLACK)
-#
-# 	 # draw the game board and marks:
-# 	 game.draw()
-#
-# 	 # --- Go ahead and update the screen with what we've drawn.
-# 	 pygame.display.flip()
-#
-# 	 # --- Limit to 60 frames per second
-# 	 clock.tick(60)
-#
-# # Close the window and quit.
-# # If you forget this line, the program will 'hang' on exit if running from IDLE.
-# pygame.quit()
+if run_minimax == False:
+	# start pygame:
+	pygame.init()
+	size = (WIDTH, HEIGHT)
+	screen = pygame.display.set_mode(size)
 
+	# start game:
+	game = Game()
 
-pygame.init()
-size = (WIDTH, HEIGHT)
-screen = pygame.display.set_mode(size)
-game = Game()
-clock = pygame.time.Clock()
-for maximizingPlayerIndex in [0]:
+	# Loop until the user clicks the close button.
+	done = False
+
+	# Used to manage how fast the screen updates
+	clock = pygame.time.Clock()
+
+	# game loop:
+	while not done:
+		 # --- Main event loop
+		 for event in pygame.event.get(): # User did something
+			 if event.type == pygame.QUIT: # If user clicked close
+				 done = True # Flag that we are done so we exit this loop
+			 if event.type == pygame.KEYDOWN:
+				 entry = str(event.key)
+			 if event.type == pygame.MOUSEBUTTONDOWN:
+				 mouse_x, mouse_y = pygame.mouse.get_pos()
+				 game.evaluate_click(pygame.mouse.get_pos())
+
+		 # --- Drawing code should go here
+
+		 # First, clear the screen to black. Don't put other drawing commands
+		 # above this, or they will be erased with this command.
+		 screen.fill(BLACK)
+
+		 # draw the game board and marks:
+		 game.draw()
+
+		 # --- Go ahead and update the screen with what we've drawn.
+		 pygame.display.flip()
+
+		 # --- Limit to 60 frames per second
+		 clock.tick(60)
+
+	# Close the window and quit.
+	# If you forget this line, the program will 'hang' on exit if running from IDLE.
+	pygame.quit()
+
+else:
+	pygame.init()
+	size = (WIDTH, HEIGHT)
+	screen = pygame.display.set_mode(size)
+	game = Game()
+	clock = pygame.time.Clock()
+	maximizingPlayerIndex = 0
 	for depth in [3]:
-		ratio, best_moves = minimax(game, depth, maximizingPlayerIndex)
+		ratio, best_moves = minimax(game, depth, maximizingPlayerIndex, framerate=60)
 		print("minimaxval", (maximizingPlayerIndex == game.turn % 2), depth, ratio, best_moves)
-	# screen.fill(BLACK)
-	# game.draw()
-	# pygame.display.flip()
-	# clock.tick(60)
-pygame.quit()
+	pygame.quit()
