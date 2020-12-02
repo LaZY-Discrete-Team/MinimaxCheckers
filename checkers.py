@@ -2,24 +2,26 @@
 Modified version of https://github.com/brettpilch/pygame-checkers
 """
 
+import copy
 import pygame
 import math
 import random
+import time
 
 # Define some colors
-BLACK    = (   0,   0,   0)
-WHITE    = ( 255, 255, 255)
-GREEN    = (   0, 255,   0)
-RED      = ( 255,   0,   0)
-BLUE     = (   0,   0, 255)
-YELLOW   = ( 255, 255,   0)
-TRANS    = (   1,   2,   3)
+BLACK	= (   0,   0,   0)
+WHITE	= ( 255, 255, 255)
+GREEN	= (   0, 255,   0)
+RED	  	= ( 255,   0,   0)
+BLUE	= (   0,   0, 255)
+YELLOW  = ( 255, 255,   0)
+TRANS	= (   1,   2,   3)
 
 # CONSTANTS:
-WIDTH = 700
-HEIGHT = WIDTH
+WIDTH = 600
+HEIGHT = 600
 ROWS = 8
-COLS = ROWS
+COLS = 8
 MARK_SIZE = int(WIDTH / ROWS / 2)
 
 class Game:
@@ -29,14 +31,15 @@ class Game:
 		Start a new game with an empty board and random player going first.
 		"""
 		self.status = 'playing'
-		self.turn = 1 # random.randrange(2)
+		self.turn = 0 # random.randrange(2)
 		self.players = ['r','b']
+		self.tokens = [12, 12]
 		self.selected_token = None
 		self.jumping = False
 		pygame.display.set_caption("%s's turn" % self.players[self.turn % 2])
 		self.game_board = [['r','-','r','-','r','-','r','-'],
 						   ['-','r','-','r','-','r','-','r'],
-			  			   ['r','-','r','-','r','-','r','-'],
+						   ['r','-','r','-','r','-','r','-'],
 						   ['-','-','-','-','-','-','-','-'],
 						   ['-','-','-','-','-','-','-','-'],
 						   ['-','b','-','b','-','b','-','b'],
@@ -50,12 +53,19 @@ class Game:
 		Start a new game if the game is over.
 		"""
 		if self.status == 'playing':
-			row, column = get_clicked_row(mouse_pos), get_clicked_column(mouse_pos)
+			to_loc = get_clicked_row(mouse_pos), get_clicked_column(mouse_pos)
+			player = self.players[self.turn % 2]
 			if self.selected_token:
-				move = self.is_valid_move(self.players[self.turn % 2], self.selected_token, row, column)
+				move = self.is_valid_move(player, self.selected_token, to_loc)
 				if move[0]:
-					self.play(self.players[self.turn % 2], self.selected_token, row, column, move[1])
-				elif row == self.selected_token[0] and column == self.selected_token[1]:
+					winner = self.play(player, self.selected_token, to_loc, move[1])
+					if winner is None:
+						pygame.display.set_caption("%s's turn" % player)
+					elif winner == 'draw':
+						pygame.display.set_caption("It's a stalemate! Click to start again")
+					else:
+						pygame.display.set_caption("%s wins! Click to start again" % winner)
+				elif to_loc[0] == self.selected_token[0] and to_loc[1] == self.selected_token[1]:
 					self.selected_token = None
 					if self.jumping:
 						self.jumping = False
@@ -63,17 +73,19 @@ class Game:
 				else:
 					print('invalid move')
 			else:
-				if self.game_board[row][column].lower() == self.players[self.turn % 2]:
-					self.selected_token = [row, column]
+				if self.game_board[to_loc[0]][to_loc[1]].lower() == player:
+					self.selected_token = to_loc
 		elif self.status == 'game over':
 			self.__init__()
 
-	def is_valid_move(self, player, token_location, to_row, to_col):
+	def is_valid_move(self, player, from_loc, to_loc):
 		"""
 		Check if clicked location is a valid square for player to move to.
 		"""
-		from_row = token_location[0]
-		from_col = token_location[1]
+		from_row = from_loc[0]
+		from_col = from_loc[1]
+		to_row = to_loc[0]
+		to_col = to_loc[1]
 		token_char = self.game_board[from_row][from_col]
 		if self.game_board[to_row][to_col] != '-':
 			return False, None
@@ -88,53 +100,65 @@ class Game:
 				return True, [jump_row, jump_col]
 		return False, None
 
-	def play(self, player, token_location, to_row, to_col, jump):
+	def possible_moves(self, player):
+		ind = []
+		for i, x in enumerate(self.game_board):
+			for j, y in enumerate(x):
+				if y == player:
+					ind.append([i, j])
+		moves = []
+		for i in ind: # todo fix this inefficiency of checking king jumps
+			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1]]: #,[2,2],[2,-2],[-2,2],[-2,-2]]:
+					if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
+						if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
+							ivm = self.is_valid_move(player, i, [i[0]+p, i[1]+q])
+							if ivm[0] == True: moves.append([i, [i[0]+p, i[1]+q], ivm[1]])
+		return moves
+
+	def play(self, player, from_loc, to_loc, jump):
 		"""
 		Move selected token to a particular square, then check to see if the game is over.
 		"""
-		from_row = token_location[0]
-		from_col = token_location[1]
+		from_row = from_loc[0]
+		from_col = from_loc[1]
+		to_row = to_loc[0]
+		to_col = to_loc[1]
 		token_char = self.game_board[from_row][from_col]
+		# for i in game.game_board:
+		# 	print(i)
+		# print()
 		self.game_board[to_row][to_col] = token_char
 		self.game_board[from_row][from_col] = '-'
-		if (player == 'r' and to_row == 7) or (player == 'b' and to_row == 0):
+		if (player == 'r' and to_row == ROWS-1) or (player == 'b' and to_row == 0):
 			self.game_board[to_row][to_col] = token_char.upper()
 		if jump:
-			print("jump!: ", jump)
+			# print("jump!: ", jump)
 			self.game_board[int(jump[0])][int(jump[1])] = '-'
 			self.selected_token = [to_row, to_col]
 			self.jumping = True
+			self.tokens[player == self.players[1]] -= 1
 		else:
 			self.selected_token = None
 			self.next_turn()
 		winner = self.check_winner()
-		if winner is None:
-			pygame.display.set_caption("%s's turn" % self.players[self.turn % 2])
-		elif winner == 'draw':
-			pygame.display.set_caption("It's a stalemate! Click to start again")
+		# print(self.tokens)
+		if winner != None:
 			self.status = 'game over'
-		else:
-			pygame.display.set_caption("%s wins! Click to start again" % winner)
-			self.status = 'game over'
+		return winner
 
 	def next_turn(self):
 		self.turn += 1
 		pygame.display.set_caption("%s's turn" % self.players[self.turn % 2])
-		print(self.game_board)
-		print(self.turn)
-		print(self.selected_token)
 
 	def check_winner(self):
 		"""
 		check to see if someone won, or if it is a draw.
 		"""
-		x = sum([row.count('r') + row.count('r') for row in self.game_board])
-		if x == 0:
-			return 'b'
-		o = sum([row.count('b') + row.count('b') for row in self.game_board])
-		if o == 0:
-			return 'r'
-		if x == 1 and o == 1:
+		if self.tokens[0] == 0:
+			return self.players[1]
+		if self.tokens[1] == 0:
+			return self.players[0]
+		if self.tokens[0] == 1 & self.tokens[1] == 1:
 			return 'draw'
 		return None
 
@@ -164,7 +188,7 @@ class Game:
 					x = WIDTH / ROWS * c + WIDTH / ROWS / 2
 					y = HEIGHT / COLS * r + HEIGHT / COLS / 2
 					#screen.blit(mark_text, [x - mark_text.get_width() / 2, y - mark_text.get_height() / 2])
-					pygame.draw.circle(screen, color, (x, y), MARK_SIZE)
+					pygame.draw.circle(screen, color, (int(x), int(y)), MARK_SIZE)
 
 # Helper functions:
 def get_clicked_column(mouse_pos):
@@ -181,47 +205,124 @@ def get_clicked_row(mouse_pos):
 			return i - 1
 	return COLS-1
 
-# start pygame:
+def minimax(game, depth, pl):
+	player = game.players[game.turn % 2]
+
+	speed = 10
+	# timeout = .01
+
+	if (depth == 0) | (game.check_winner() != None):
+		your_pieces = game.tokens[pl]
+		their_pieces = game.tokens[(pl+1)%2]
+
+		if game.tokens != [12,12]:
+			print("minimax", depth, player, game.tokens)
+		# screen.fill(BLACK)
+		# game.draw()
+		# pygame.display.flip()
+		# clock.tick(speed)
+		# # time.sleep(timeout)
+		return your_pieces/their_pieces, []
+	elif player == game.players[pl]:
+		value = -1
+		moves = game.possible_moves(player)
+		best_move = [moves[0]]
+		for move in moves:
+			new_game = copy.deepcopy(game)
+			new_game.play(player, move[0], move[1], move[2])
+			minimaxer = minimax(new_game, depth-1, pl)
+			value = max(value, minimaxer[0])
+			if value == minimaxer[0]:
+				best_move.append(move)
+		# # print("minimax", depth, player, game.tokens)
+		# screen.fill(BLACK)
+		# game.draw()
+		# pygame.display.flip()
+		# clock.tick(speed)
+		# # time.sleep(timeout)
+		return value, best_move
+	else: # (* minimizing player *)
+		value = 13
+		moves = game.possible_moves(player)
+		best_move = [moves[0]]
+		for move in moves:
+			new_game = copy.deepcopy(game)
+			new_game.play(player, move[0], move[1], move[2])
+			minimaxer = minimax(new_game, depth-1, pl)
+			value = min(value, minimaxer[0])
+			if value == minimaxer[0]:
+				best_move.append(move)
+		# # print("minimax", depth, player, game.tokens)
+		# screen.fill(BLACK)
+		# game.draw()
+		# pygame.display.flip()
+		# clock.tick(speed)
+		# # time.sleep(timeout)
+		return value, best_move
+
+
+# # start pygame:
+# pygame.init()
+# size = (WIDTH, HEIGHT)
+# screen = pygame.display.set_mode(size)
+#
+# # start game:
+# game = Game()
+#
+# # Loop until the user clicks the close button.
+# done = False
+#
+# # Used to manage how fast the screen updates
+# clock = pygame.time.Clock()
+#
+# # game loop:
+# while not done:
+# 	 # --- Main event loop
+# 	 for event in pygame.event.get(): # User did something
+# 		 if event.type == pygame.QUIT: # If user clicked close
+# 			 done = True # Flag that we are done so we exit this loop
+# 		 if event.type == pygame.KEYDOWN:
+# 			 entry = str(event.key)
+# 		 if event.type == pygame.MOUSEBUTTONDOWN:
+# 			 mouse_x, mouse_y = pygame.mouse.get_pos()
+# 			 game.evaluate_click(pygame.mouse.get_pos())
+#
+# 	 # --- Drawing code should go here
+#
+# 	 # First, clear the screen to black. Don't put other drawing commands
+# 	 # above this, or they will be erased with this command.
+# 	 screen.fill(BLACK)
+#
+# 	 # draw the game board and marks:
+# 	 game.draw()
+#
+# 	 # --- Go ahead and update the screen with what we've drawn.
+# 	 pygame.display.flip()
+#
+# 	 # --- Limit to 60 frames per second
+# 	 clock.tick(60)
+#
+# # Close the window and quit.
+# # If you forget this line, the program will 'hang' on exit if running from IDLE.
+# pygame.quit()
+
+# game = Game()
+# for mp in [0]:
+# 	for depth in [2,3,4,5,6]:
+# 		minimaxval, best_move = minimax(game, depth, mp)
+# 		print("minimaxval", (mp == game.turn % 2), depth, minimaxval, best_move)
+
 pygame.init()
 size = (WIDTH, HEIGHT)
 screen = pygame.display.set_mode(size)
-
-# start game:
 game = Game()
-
-# Loop until the user clicks the close button.
-done = False
-
-# Used to manage how fast the screen updates
 clock = pygame.time.Clock()
-
-# game loop:
-while not done:
-    # --- Main event loop
-    for event in pygame.event.get(): # User did something
-        if event.type == pygame.QUIT: # If user clicked close
-            done = True # Flag that we are done so we exit this loop
-        if event.type == pygame.KEYDOWN:
-            entry = str(event.key)
-        if event.type == pygame.MOUSEBUTTONDOWN:
-        	mouse_x, mouse_y = pygame.mouse.get_pos()
-        	game.evaluate_click(pygame.mouse.get_pos())
-
-    # --- Drawing code should go here
-
-    # First, clear the screen to black. Don't put other drawing commands
-    # above this, or they will be erased with this command.
-    screen.fill(BLACK)
-
-    # draw the game board and marks:
-    game.draw()
-
-    # --- Go ahead and update the screen with what we've drawn.
-    pygame.display.flip()
-
-    # --- Limit to 60 frames per second
-    clock.tick(60)
-
-# Close the window and quit.
-# If you forget this line, the program will 'hang' on exit if running from IDLE.
+for mp in [0]:
+	for depth in [5]:
+		minimaxval = minimax(game, depth, mp)
+		print("minimaxval", (mp == game.turn % 2), depth, minimaxval)
+	# screen.fill(BLACK)
+	# game.draw()
+	# pygame.display.flip()
+	# clock.tick(60)
 pygame.quit()
