@@ -100,30 +100,44 @@ class Game:
 				return True, [jump_row, jump_col]
 		return False, None
 
-	def possible_moves(self, player):
+	def get_all_pieces(self, player):
+		pieces = []
+		for i, x in enumerate(self.game_board):
+			for j, y in enumerate(x):
+				if y.lower() == player:
+					pieces.append([i, j])
+		return pieces
+
+	def get_valid_moves(self, player):
 		moves = []
-		if self.selected_token == None:
-			ind = []
-			for i, x in enumerate(self.game_board):
-				for j, y in enumerate(x):
-					if y.lower() == player:
-						ind.append([i, j])
-			for i in ind: # todo: fix this inefficiency of checking king moves too
-				for p,q in [[1,1],[-1,-1],[1,-1],[-1,1],[2,2],[2,-2],[-2,2],[-2,-2]]:
-						if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
-							if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
-								ivm = self.is_valid_move(player, i, [i[0]+p, i[1]+q])
-								if ivm[0] == True: moves.append([i, [i[0]+p, i[1]+q], ivm[1]])
-		else:
-			i = self.selected_token
-			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1],[2,2],[2,-2],[-2,2],[-2,-2]]:
-					if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
-						if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
-							ivm = self.is_valid_move(player, i, [i[0]+p, i[1]+q])
-							if ivm[0] == True: moves.append([i, [i[0]+p, i[1]+q], ivm[1]])
+		for i in self.get_all_pieces(player):
+			# try all of the single diagonals
+			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1]]:
+				to_loc = [i[0]+p, i[1]+q]
+				if (to_loc[0] < ROWS) & (to_loc[0] >= 0) & (to_loc[1] < COLS) & (to_loc[1] >= 0):
+					j = [i[0]+p, i[1]+q]
+					is_valid_move, jumped = self.is_valid_move(player, i, j)
+					if is_valid_move == True:
+						moves.append([i, [i[0]+p, i[1]+q], None])
+
+			# try all of the jumps, including multiple in a row
+			can_jump = True
+			from_loc = i
+			jumped_list = []
+			while can_jump:
+				can_jump = False
+				for p,q in [[2,2],[2,-2],[-2,2],[-2,-2]]:
+					to_loc = [from_loc[0]+p, from_loc[1]+q]
+					if (to_loc[0] < ROWS) & (to_loc[0] >= 0) & (to_loc[1] < COLS) & (to_loc[1] >= 0):
+						is_valid_move, jumped = self.is_valid_move(player, from_loc, to_loc)
+						if is_valid_move == True and jumped != None:
+							can_jump = True
+							jumped_list.append(jumped)
+							moves.append([i, to_loc, jumped_list])
+							from_loc = to_loc
 		return moves
 
-	def play(self, player, from_loc, to_loc, jump):
+	def play(self, player, from_loc, to_loc, jump, auto=False):
 		"""
 		Move selected token to a particular square, then check to see if the game is over.
 		"""
@@ -136,7 +150,16 @@ class Game:
 		self.game_board[from_row][from_col] = '-'
 		if (player == 'r' and to_row == ROWS-1) or (player == 'b' and to_row == 0):
 			self.game_board[to_row][to_col] = token_char.upper()
-		if jump:
+
+		if auto and jump != None:
+			# auto mode when computer playing does multiple jumps and advances to next turn
+			for j in jump:
+				self.game_board[int(j[0])][int(j[1])] = '-'
+				self.tokens[player == self.players[0]] -= 1
+			self.selected_token = None
+			self.jumping = False
+			self.next_turn()
+		elif jump:
 			self.game_board[int(jump[0])][int(jump[1])] = '-'
 			self.selected_token = [to_row, to_col]
 			self.jumping = True
@@ -206,12 +229,11 @@ def get_clicked_row(mouse_pos):
 			return i - 1
 	return COLS-1
 
-def minimax(game, depth, pl, framerate=None):
+def minimax(game, depth, max_player):
 	""" args
 	game: the game object holding game state
 	depth: how many moves ahead to search in the game tree
-	pl: index of the player that you want to maximize (0 or 1)
-	framerate: if specified, will draw the possible future game states
+	max_player: bool whether to maximize or maximize this turn
 
 	returns
 	value: maximizing player pieces divided by minimizing player pieces
@@ -219,138 +241,82 @@ def minimax(game, depth, pl, framerate=None):
 	"""
 	player = game.players[game.turn % 2] # the player whose turn it is currently
 
-	# base case, depth reached
-	if (depth == 0) | (game.check_winner() != None):
-		your_pieces = game.tokens[pl]
-		their_pieces = game.tokens[(pl+1)%2]
-		value = your_pieces/their_pieces # metric on how maximizing player is doing
-		if framerate != None: # draw game state if framerate specified
-			screen.fill(BLACK)
-			game.draw()
-			pygame.display.flip()
-			clock.tick(framerate)
-			print(depth, game.players[pl], player, game.tokens, value)
-		return value, []
+	# base case, depth reached or game over
+	if depth == 0 or game.check_winner() != None:
+		your_pieces = game.tokens[max_player]
+		their_pieces = game.tokens[(max_player+1)%2]
+		eval = your_pieces - their_pieces # metric on how maximizing player is doing
+		return eval, None
 
-	# maximizing player's turn
-	elif player == game.players[pl]:
-		value = 0 # starting value lower than the lowest ratio possible, 1/12
-		moves = game.possible_moves(player)
-		best_move = []
-		for move in moves:
-
+	elif max_player != player: # maximizing player's turn
+		max_eval = -12
+		best_move = None
+		for move in game.get_valid_moves(player):
 			# make a copy of the game to play out the current move in
 			new_game = copy.deepcopy(game)
-			new_game.play(player, move[0], move[1], move[2])
-			minimaxer = minimax(new_game, depth-1, pl, framerate=framerate)
+			new_game.play(player, move[0], move[1], move[2], True)
+			eval = minimax(new_game, depth-1, max_player)[0]
+			max_eval = max(max_eval, eval)
+			if max_eval == eval: # better value than previous best move
+				best_move = move
+		return max_eval, best_move
 
-			# update best_move array based on the value this move gives
-			tmpval = max(value, minimaxer[0])
-			if value < tmpval: # better value than previous best move
-				best_move = [move]
-				value = tmpval
-			elif tmpval == minimaxer[0]: # same value as previous best move
-				best_move.append(move)
-
-		print("maximize", depth, game.players[pl], player, game.tokens, value)
-		return value, best_move
-
-	# minimizing player's turn
-	else:
-		value = 13 # starting value higher than the highest ratio possible, 12/1
-		moves = game.possible_moves(player)
-		best_move = []
-		for move in moves:
-
+	else: # minimizing player's turn
+		min_eval = 12
+		best_move = None
+		for move in game.get_valid_moves(player):
 			# make a copy of the game to play out the current move in
 			new_game = copy.deepcopy(game)
-			new_game.play(player, move[0], move[1], move[2])
-			minimaxer = minimax(new_game, depth-1, pl, framerate=framerate)
+			new_game.play(player, move[0], move[1], move[2], True)
+			eval = minimax(new_game, depth-1, max_player)[0]
+			min_eval = min(min_eval, eval)
+			if min_eval == eval: # better value than previous best move
+				best_move = move
+		return min_eval, best_move
 
-			# update best_move array based on the value this move gives
-			tmpval = min(value, minimaxer[0])
-			if value > tmpval: # better value than previous best move
-				best_move = [move]
-				value = tmpval
-			elif tmpval == minimaxer[0]: # same value as previous best move
-				best_move.append(move)
+# game setup and constants
+pygame.init()
+size = (WIDTH, HEIGHT)
+screen = pygame.display.set_mode(size)
+game = Game() # start game
+done = False # Loop until the user clicks the close button
+clock = pygame.time.Clock() # Used to manage how fast the screen updates
+framerate = 60
 
-		print("minimize", depth, game.players[pl], player, game.tokens, value)
-		return value, best_move
-
+# flip to false to play normal 2-player checkers
 run_minimax = True
-if run_minimax == False:
-	# start pygame:
-	pygame.init()
-	size = (WIDTH, HEIGHT)
-	screen = pygame.display.set_mode(size)
-	game = Game() # start game
-	done = False # Loop until the user clicks the close button.
-	clock = pygame.time.Clock() # Used to manage how fast the screen updates
+depth = 3 # How many moves ahead to look
+max_player = 0 # play as red 'r' index 0
 
-	# game loop:
-	while not done:
+while not done:
+	if game.turn % 2 == max_player and run_minimax: # if it's the computer's turn
+		# figure out which moves would be best
+		eval, best_move = minimax(game, depth, max_player)
+		print("EVALUATION:", eval)
+		print("BEST MOVE:", best_move)
 
-		 # Main event loop
-		 for event in pygame.event.get(): # User did something
-			 if event.type == pygame.QUIT: # If user clicked close
-				 done = True # Flag that we are done so we exit this loop
-			 if event.type == pygame.KEYDOWN:
-				 entry = str(event.key)
-			 if event.type == pygame.MOUSEBUTTONDOWN:
-				 mouse_x, mouse_y = pygame.mouse.get_pos()
-				 game.evaluate_click(pygame.mouse.get_pos())
+		# play one of the best moves
+		game.play(game.players[max_player], best_move[0], best_move[1], best_move[2], True)
+		print('Tokens', game.tokens, '\n')
 
-		 # Drawing code should go here
-		 screen.fill(BLACK) # clear the screen to black
-		 game.draw() # draw the game board and marks
-		 pygame.display.flip() # update the screen with what we've drawn
-		 clock.tick(60) # Limit to 60 frames per second
+		screen.fill(BLACK)
+		game.draw()
+		pygame.display.flip()
+		clock.tick(framerate)
+		# time.sleep(1)
+	else: # human's turn
+		for event in pygame.event.get(): # User did something
+			if event.type == pygame.QUIT: # If user clicked close
+				done = True # Flag that we are done so we exit this loop
+			if event.type == pygame.KEYDOWN:
+				entry = str(event.key)
+			if event.type == pygame.MOUSEBUTTONDOWN:
+				mouse_x, mouse_y = pygame.mouse.get_pos()
+				game.evaluate_click(pygame.mouse.get_pos())
 
-	pygame.quit() # Close the window and quit.
+		screen.fill(BLACK) # clear the screen to black
+		game.draw() # draw the game board and marks
+		pygame.display.flip() # update the screen with what we've drawn
+		clock.tick(60) # Limit to 60 frames per second
 
-else:
-	done = False
-	pygame.init()
-	size = (WIDTH, HEIGHT)
-	screen = pygame.display.set_mode(size)
-	game = Game()
-	clock = pygame.time.Clock()
-	maximizingPlayerIndex = 0 # which player the computer is playing for
-	depth = 4 # How many moves ahead to look
-	framerate = 60
-
-	while not done:
-
-		# if it's the computer's turn
-		if game.turn % 2 == maximizingPlayerIndex:
-
-			# figure out which moves would be best
-			ratio, best_moves = minimax(game, depth, maximizingPlayerIndex, framerate=None)
-			print("BEST MOVES:", best_moves)
-			print()
-
-			# play one of the best moves
-			game.play(game.players[game.turn % 2], best_moves[0][0], best_moves[0][1], best_moves[0][2])
-			screen.fill(BLACK)
-			game.draw()
-			pygame.display.flip()
-			clock.tick(framerate)
-
-		# if it's the human's turn
-		else:
-			for event in pygame.event.get(): # User did something
-				if event.type == pygame.QUIT: # If user clicked close
-					done = True # Flag that we are done so we exit this loop
-				if event.type == pygame.KEYDOWN:
-					entry = str(event.key)
-				if event.type == pygame.MOUSEBUTTONDOWN:
-					mouse_x, mouse_y = pygame.mouse.get_pos()
-					game.evaluate_click(pygame.mouse.get_pos())
-
-		 screen.fill(BLACK) # clear the screen to black
-		 game.draw() # draw the game board and marks
-		 pygame.display.flip() # update the screen with what we've drawn
-		 clock.tick(60) # Limit to 60 frames per second
-
-	pygame.quit() # Close the window and quit.
+pygame.quit() # Close the window and quit.
