@@ -1,5 +1,9 @@
 """
 Modified version of https://github.com/brettpilch/pygame-checkers
+
+Helpful reference videos:
+Depth limit minimax https://www.youtube.com/watch?v=mYbrH1Cl3nw
+Alpha-Beta pruning https://www.youtube.com/watch?v=l-hh51ncgDI
 """
 
 import copy
@@ -212,7 +216,14 @@ class Game:
 					y = HEIGHT / COLS * r + HEIGHT / COLS / 2
 					pygame.draw.circle(screen, color, (int(x), int(y)), MARK_SIZE)
 					if self.game_board[r][c].isupper():
-						pygame.draw.circle(screen, BLACK, (int(x), int(y)), int(MARK_SIZE*7/8), width=int(MARK_SIZE/8))
+						pygame.draw.circle(screen, BLACK, (int(x), int(y)), int(MARK_SIZE*7/8))
+						pygame.draw.circle(screen, color, (int(x), int(y)), int(MARK_SIZE*3/4))
+
+	def evaluate(self, max_player):
+		""" metric evaluating game state """
+		your_pieces = game.tokens[max_player]
+		their_pieces = game.tokens[(max_player+1)%2]
+		return your_pieces - their_pieces
 
 # Helper functions:
 def get_clicked_column(mouse_pos):
@@ -229,47 +240,49 @@ def get_clicked_row(mouse_pos):
 			return i - 1
 	return COLS-1
 
-def minimax(game, depth, max_player):
-	"""
-	game: the game object holding game state
+def minimax(game, depth, max_player, alpha=float('-inf'), beta=float('+inf')):
+	"""	game: the game object holding game state
 	depth: how many moves ahead to search in the game tree
 	max_player: index of the player the computer is playing for
-
-	returns
-	value: max_player's pieces minus other player's pieces
+	eval: evaluation of game state
 	best_move: the best move to make, given as [from_loc, to_loc, pieces_jumped]
 	"""
 	player = game.players[game.turn % 2] # player whose turn it is currently
 	if depth == 0 or game.check_winner() != None: # base case: depth reached/game over
-		your_pieces = game.tokens[max_player]
-		their_pieces = game.tokens[(max_player+1)%2]
-		eval = your_pieces - their_pieces # metric on how maximizing player is doing
-		return eval, None
+		return game.evaluate(max_player), None
 
-	elif max_player != player: # maximizing player's turn
-		max_eval = -12
+	elif max_player == player: # maximizing player's turn
+		max_eval = float('-inf')
 		best_move = None
 		for move in game.get_valid_moves(player):
 			# make a copy of the game to play out the current move in
 			new_game = copy.deepcopy(game)
 			new_game.play(player, move[0], move[1], move[2], True)
-			eval = minimax(new_game, depth-1, max_player)[0]
+			eval = minimax(new_game, depth-1, max_player, alpha, beta)[0]
 			max_eval = max(max_eval, eval)
 			if max_eval == eval: # better value than previous best move
 				best_move = move
+			alpha = max(alpha, eval)
+			if beta <= alpha:
+				print("prune")
+				break
 		return max_eval, best_move
 
 	else: # minimizing player's turn
-		min_eval = 12
+		min_eval = float('+inf')
 		best_move = None
 		for move in game.get_valid_moves(player):
 			# make a copy of the game to play out the current move in
 			new_game = copy.deepcopy(game)
 			new_game.play(player, move[0], move[1], move[2], True)
-			eval = minimax(new_game, depth-1, max_player)[0]
+			eval = minimax(new_game, depth-1, max_player, alpha, beta)[0]
 			min_eval = min(min_eval, eval)
 			if min_eval == eval: # better value than previous best move
 				best_move = move
+			beta = min(beta, eval)
+			if beta <= alpha:
+				print("prune")
+				break
 		return min_eval, best_move
 
 # game setup and constants
@@ -283,7 +296,7 @@ framerate = 60
 
 # flip to false to play normal 2-player checkers
 run_minimax = True
-depth = 3 # How many moves ahead to look
+depth = 4 # How many moves ahead to look
 max_player = 0 # play as red 'r' index 0
 
 while not done:
