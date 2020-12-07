@@ -230,19 +230,17 @@ def get_clicked_row(mouse_pos):
 	return COLS-1
 
 def minimax(game, depth, max_player):
-	""" args
+	"""
 	game: the game object holding game state
 	depth: how many moves ahead to search in the game tree
-	max_player: bool whether to maximize or maximize this turn
+	max_player: index of the player the computer is playing for
 
 	returns
-	value: maximizing player pieces divided by minimizing player pieces
-	best_moves: array of the best moves to make
+	value: max_player's pieces minus other player's pieces
+	best_move: the best move to make, given as [from_loc, to_loc, pieces_jumped]
 	"""
-	player = game.players[game.turn % 2] # the player whose turn it is currently
-
-	# base case, depth reached or game over
-	if depth == 0 or game.check_winner() != None:
+	player = game.players[game.turn % 2] # player whose turn it is currently
+	if depth == 0 or game.check_winner() != None: # base case: depth reached/game over
 		your_pieces = game.tokens[max_player]
 		their_pieces = game.tokens[(max_player+1)%2]
 		eval = your_pieces - their_pieces # metric on how maximizing player is doing
@@ -289,22 +287,30 @@ depth = 3 # How many moves ahead to look
 max_player = 0 # play as red 'r' index 0
 
 while not done:
-	if game.turn % 2 == max_player and run_minimax: # if it's the computer's turn
-		# figure out which moves would be best
+
+	# if it's the computer's turn
+	if game.turn % 2 == max_player and run_minimax:
+
+		# figure out which move would be best
 		eval, best_move = minimax(game, depth, max_player)
 		print("EVALUATION:", eval)
 		print("BEST MOVE:", best_move)
 
-		# play one of the best moves
-		game.play(game.players[max_player], best_move[0], best_move[1], best_move[2], True)
-		print('Tokens', game.tokens, '\n')
-
+		# play the best move
+		# try:
+		game.play(game.players[game.turn % 2], best_move[0], best_move[1], best_move[2], True)
 		screen.fill(BLACK)
 		game.draw()
 		pygame.display.flip()
 		clock.tick(framerate)
+		print('Score', game.tokens, '\n')
+		# except:
+		# 	print("Stalemate :(")
+		# 	break
 		# time.sleep(1)
-	else: # human's turn
+
+	# if it's the human's turn
+	else:
 		for event in pygame.event.get(): # User did something
 			if event.type == pygame.QUIT: # If user clicked close
 				done = True # Flag that we are done so we exit this loop
