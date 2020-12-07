@@ -101,13 +101,21 @@ class Game:
 		return False, None
 
 	def possible_moves(self, player):
-		ind = []
-		for i, x in enumerate(self.game_board):
-			for j, y in enumerate(x):
-				if y == player:
-					ind.append([i, j])
 		moves = []
-		for i in ind: # todo: fix this inefficiency of checking king moves too
+		if self.selected_token == None:
+			ind = []
+			for i, x in enumerate(self.game_board):
+				for j, y in enumerate(x):
+					if y.lower() == player:
+						ind.append([i, j])
+			for i in ind: # todo: fix this inefficiency of checking king moves too
+				for p,q in [[1,1],[-1,-1],[1,-1],[-1,1],[2,2],[2,-2],[-2,2],[-2,-2]]:
+						if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
+							if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
+								ivm = self.is_valid_move(player, i, [i[0]+p, i[1]+q])
+								if ivm[0] == True: moves.append([i, [i[0]+p, i[1]+q], ivm[1]])
+		else:
+			i = self.selected_token
 			for p,q in [[1,1],[-1,-1],[1,-1],[-1,1],[2,2],[2,-2],[-2,2],[-2,-2]]:
 					if ((i[0]+p) < ROWS) & ((i[0]+p) >= 0):
 						if ((i[1]+q) < COLS) & ((i[1]+q) >= 0):
@@ -124,19 +132,15 @@ class Game:
 		to_row = to_loc[0]
 		to_col = to_loc[1]
 		token_char = self.game_board[from_row][from_col]
-		# for i in game.game_board:
-		# 	print(i)
-		# print()
 		self.game_board[to_row][to_col] = token_char
 		self.game_board[from_row][from_col] = '-'
 		if (player == 'r' and to_row == ROWS-1) or (player == 'b' and to_row == 0):
 			self.game_board[to_row][to_col] = token_char.upper()
 		if jump:
-			# print("jump!: ", jump)
 			self.game_board[int(jump[0])][int(jump[1])] = '-'
 			self.selected_token = [to_row, to_col]
 			self.jumping = True
-			self.tokens[player == self.players[1]] -= 1
+			self.tokens[player == self.players[0]] -= 1
 		else:
 			self.selected_token = None
 			self.next_turn()
@@ -165,29 +169,27 @@ class Game:
 		"""
 		Draw the game board and the X's and O's.
 		"""
-
 		for i in range(ROWS+1):
 			for j in range(COLS+1):
 				if (i+j) % 2 == 1: # flip color of board
 					pygame.draw.rect(screen, WHITE, (i * WIDTH / ROWS, j * HEIGHT / COLS, WIDTH / ROWS, HEIGHT / COLS))
 
-		font = pygame.font.SysFont('Calibri', MARK_SIZE, False, False)
 		for r in range(len(self.game_board)):
 			for c in range(len(self.game_board[r])):
 				mark = self.game_board[r][c]
 				if self.players[0] == mark.lower():
-					color = BLUE
-				else:
 					color = RED
+				else:
+					color = BLUE
 				if self.selected_token:
 					if self.selected_token[0] == r and self.selected_token[1] == c:
 						color = YELLOW
 				if mark != '-':
-					mark_text = font.render(self.game_board[r][c], True, color)
 					x = WIDTH / ROWS * c + WIDTH / ROWS / 2
 					y = HEIGHT / COLS * r + HEIGHT / COLS / 2
-					#screen.blit(mark_text, [x - mark_text.get_width() / 2, y - mark_text.get_height() / 2])
 					pygame.draw.circle(screen, color, (int(x), int(y)), MARK_SIZE)
+					if self.game_board[r][c].isupper():
+						pygame.draw.circle(screen, BLACK, (int(x), int(y)), int(MARK_SIZE*7/8), width=int(MARK_SIZE/8))
 
 # Helper functions:
 def get_clicked_column(mouse_pos):
@@ -209,55 +211,50 @@ def minimax(game, depth, pl, framerate=None):
 	if (depth == 0) | (game.check_winner() != None):
 		your_pieces = game.tokens[pl]
 		their_pieces = game.tokens[(pl+1)%2]
-
-		# if game.tokens != [12,12]:
-		# print("minimax", depth, player, game.tokens)
-
+		value = your_pieces/their_pieces
 		if framerate != None:
 			screen.fill(BLACK)
 			game.draw()
 			pygame.display.flip()
 			clock.tick(framerate)
-		return your_pieces/their_pieces, []
+			print(depth, game.players[pl], player, game.tokens, value)
+		return value, []
 	elif player == game.players[pl]:
 		value = -1
 		moves = game.possible_moves(player)
-		best_move = [moves[0]]
+		best_move = []
 		for move in moves:
 			new_game = copy.deepcopy(game)
 			new_game.play(player, move[0], move[1], move[2])
 			minimaxer = minimax(new_game, depth-1, pl, framerate=framerate)
-			value = max(value, minimaxer[0])
-			if value == minimaxer[0]:
+			tmpval = max(value, minimaxer[0])
+			if value < tmpval:
+				best_move = [move]
+				value = tmpval
+			elif tmpval == minimaxer[0]:
 				best_move.append(move)
-		# print("minimax", depth, player, game.tokens)
-		if framerate != None:
-			screen.fill(BLACK)
-			game.draw()
-			pygame.display.flip()
-			clock.tick(framerate)
+		if depth >= 3:
+			print("val", depth, game.players[pl], player, game.tokens, value)
 		return value, best_move
 	else: # (* minimizing player *)
 		value = 13
 		moves = game.possible_moves(player)
-		best_move = [moves[0]]
+		best_move = []
 		for move in moves:
 			new_game = copy.deepcopy(game)
 			new_game.play(player, move[0], move[1], move[2])
 			minimaxer = minimax(new_game, depth-1, pl, framerate=framerate)
-			value = min(value, minimaxer[0])
-			if value == minimaxer[0]:
+			tmpval = min(value, minimaxer[0])
+			if value > tmpval:
+				best_move = [move]
+				value = tmpval
+			elif tmpval == minimaxer[0]:
 				best_move.append(move)
-		# print("minimax", depth, player, game.tokens)
-		if framerate != None:
-			screen.fill(BLACK)
-			game.draw()
-			pygame.display.flip()
-			clock.tick(framerate)
+		if depth >= 3:
+			print("val", depth, game.players[pl], player, game.tokens, value)
 		return value, best_move
 
 run_minimax = True
-
 if run_minimax == False:
 	# start pygame:
 	pygame.init()
@@ -305,13 +302,42 @@ if run_minimax == False:
 	pygame.quit()
 
 else:
+	done = False
 	pygame.init()
 	size = (WIDTH, HEIGHT)
 	screen = pygame.display.set_mode(size)
 	game = Game()
 	clock = pygame.time.Clock()
 	maximizingPlayerIndex = 0
-	for depth in [3]:
-		ratio, best_moves = minimax(game, depth, maximizingPlayerIndex, framerate=60)
-		print("minimaxval", (maximizingPlayerIndex == game.turn % 2), depth, ratio, best_moves)
+	depth = 4 # How many moves ahead to look
+	framerate = 60
+
+	while not done:
+		if game.turn % 2 == maximizingPlayerIndex:
+			ratio, best_moves = minimax(game, depth, maximizingPlayerIndex, framerate=None)
+			print("BEST MOVES:", best_moves)
+			print()
+			game.play(game.players[game.turn % 2], best_moves[0][0], best_moves[0][1], best_moves[0][2])
+			screen.fill(BLACK)
+			game.draw()
+			pygame.display.flip()
+			clock.tick(framerate)
+			# for i in game.game_board:
+			# 	print(i)
+			# print()
+			# time.sleep(1)
+		else:
+			for event in pygame.event.get(): # User did something
+				if event.type == pygame.QUIT: # If user clicked close
+					done = True # Flag that we are done so we exit this loop
+				if event.type == pygame.KEYDOWN:
+					entry = str(event.key)
+				if event.type == pygame.MOUSEBUTTONDOWN:
+					mouse_x, mouse_y = pygame.mouse.get_pos()
+					game.evaluate_click(pygame.mouse.get_pos())
+			screen.fill(BLACK)
+			game.draw()
+			pygame.display.flip()
+			clock.tick(framerate)
+			# print(game.selected_token)
 	pygame.quit()
