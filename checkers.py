@@ -331,11 +331,15 @@ else:
 			print()
 
 			# play one of the best moves
-			game.play(game.players[game.turn % 2], best_moves[0][0], best_moves[0][1], best_moves[0][2])
-			screen.fill(BLACK)
-			game.draw()
-			pygame.display.flip()
-			clock.tick(framerate)
+			try:
+				game.play(game.players[game.turn % 2], best_moves[0][0], best_moves[0][1], best_moves[0][2])
+				screen.fill(BLACK)
+				game.draw()
+				pygame.display.flip()
+				clock.tick(framerate)
+			except:
+				print("Stalemate :(")
+				break
 
 		# if it's the human's turn
 		else:
@@ -347,10 +351,9 @@ else:
 				if event.type == pygame.MOUSEBUTTONDOWN:
 					mouse_x, mouse_y = pygame.mouse.get_pos()
 					game.evaluate_click(pygame.mouse.get_pos())
-
-		 screen.fill(BLACK) # clear the screen to black
-		 game.draw() # draw the game board and marks
-		 pygame.display.flip() # update the screen with what we've drawn
-		 clock.tick(60) # Limit to 60 frames per second
+		screen.fill(BLACK) # clear the screen to black
+		game.draw() # draw the game board and marks
+		pygame.display.flip() # update the screen with what we've drawn
+		clock.tick(60) # Limit to 60 frames per second
 
 	pygame.quit() # Close the window and quit.
