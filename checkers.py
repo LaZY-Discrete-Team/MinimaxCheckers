@@ -24,8 +24,8 @@ TRANS	= (   1,   2,   3)
 # CONSTANTS:
 WIDTH = 600
 HEIGHT = 600
-ROWS = 8
-COLS = 8
+ROWS = 5
+COLS = 5
 MARK_SIZE = int(WIDTH / ROWS / 2)
 
 class Game:
@@ -41,14 +41,20 @@ class Game:
 		self.selected_token = None
 		self.jumping = False
 		pygame.display.set_caption("%s's turn" % self.players[self.turn % 2])
-		self.game_board = [['r','-','r','-','r','-','r','-'],
-						   ['-','r','-','r','-','r','-','r'],
-						   ['r','-','r','-','r','-','r','-'],
-						   ['-','-','-','-','-','-','-','-'],
-						   ['-','-','-','-','-','-','-','-'],
-						   ['-','b','-','b','-','b','-','b'],
-						   ['b','-','b','-','b','-','b','-'],
-						   ['-','b','-','b','-','b','-','b']]
+		# self.game_board = [['r','-','r','-','r','-','r','-'],
+		# 				   ['-','r','-','r','-','r','-','r'],
+		# 				   ['r','-','r','-','r','-','r','-'],
+		# 				   ['-','-','-','-','-','-','-','-'],
+		# 				   ['-','-','-','-','-','-','-','-'],
+		# 				   ['-','b','-','b','-','b','-','b'],
+		# 				   ['b','-','b','-','b','-','b','-'],
+		# 				   ['-','b','-','b','-','b','-','b']]
+
+		self.game_board = [['r','-','r','-','r'],
+						   ['-','r','-','r','-'],
+						   ['-','-','-','-','-'],
+						   ['-','b','-','b','-'],
+						   ['b','-','b','-','b']]
 
 	def evaluate_click(self, mouse_pos):
 		"""
@@ -295,7 +301,7 @@ clock = pygame.time.Clock() # Used to manage how fast the screen updates
 framerate = 60
 
 # flip to false to play normal 2-player checkers
-run_minimax = True
+run_minimax = False
 depth = 4 # How many moves ahead to look
 max_player = 0 # play as red 'r' index 0
 
