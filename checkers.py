@@ -24,8 +24,8 @@ TRANS	= (   1,   2,   3)
 # CONSTANTS:
 WIDTH = 600
 HEIGHT = 600
-ROWS = 5
-COLS = 5
+ROWS = 8
+COLS = 8
 MARK_SIZE = int(WIDTH / ROWS / 2)
 
 class Game:
@@ -38,23 +38,24 @@ class Game:
 		self.turn = 0 # random.randrange(2)
 		self.players = ['r','b']
 		self.tokens = [12, 12]
+		self.kings = [0, 0]
 		self.selected_token = None
 		self.jumping = False
 		pygame.display.set_caption("%s's turn" % self.players[self.turn % 2])
-		# self.game_board = [['r','-','r','-','r','-','r','-'],
-		# 				   ['-','r','-','r','-','r','-','r'],
-		# 				   ['r','-','r','-','r','-','r','-'],
-		# 				   ['-','-','-','-','-','-','-','-'],
-		# 				   ['-','-','-','-','-','-','-','-'],
-		# 				   ['-','b','-','b','-','b','-','b'],
-		# 				   ['b','-','b','-','b','-','b','-'],
-		# 				   ['-','b','-','b','-','b','-','b']]
+		self.game_board = [['r','-','r','-','r','-','r','-'],
+						   ['-','r','-','r','-','r','-','r'],
+						   ['r','-','r','-','r','-','r','-'],
+						   ['-','-','-','-','-','-','-','-'],
+						   ['-','-','-','-','-','-','-','-'],
+						   ['-','b','-','b','-','b','-','b'],
+						   ['b','-','b','-','b','-','b','-'],
+						   ['-','b','-','b','-','b','-','b']]
 
-		self.game_board = [['r','-','r','-','r'],
-						   ['-','r','-','r','-'],
-						   ['-','-','-','-','-'],
-						   ['-','b','-','b','-'],
-						   ['b','-','b','-','b']]
+		# self.game_board = [['r','-','r','-','r'],
+		# 				   ['-','r','-','r','-'],
+		# 				   ['-','-','-','-','-'],
+		# 				   ['-','b','-','b','-'],
+		# 				   ['b','-','b','-','b']]
 
 	def evaluate_click(self, mouse_pos):
 		"""
@@ -160,6 +161,7 @@ class Game:
 		self.game_board[from_row][from_col] = '-'
 		if (player == 'r' and to_row == ROWS-1) or (player == 'b' and to_row == 0):
 			self.game_board[to_row][to_col] = token_char.upper()
+			self.kings[player == 'b'] += 1
 
 		if auto and jump != None:
 			# auto mode when computer playing does multiple jumps and advances to next turn
@@ -190,6 +192,9 @@ class Game:
 		"""
 		check to see if someone won, or if it is a draw.
 		"""
+		# no possible moves, cornered
+		if len(self.get_valid_moves(self.players[self.turn % 2])) == 0 and self.jumping == False:
+			return self.players[1]
 		if self.tokens[0] == 0:
 			return self.players[1]
 		if self.tokens[1] == 0:
@@ -225,11 +230,14 @@ class Game:
 						pygame.draw.circle(screen, BLACK, (int(x), int(y)), int(MARK_SIZE*7/8))
 						pygame.draw.circle(screen, color, (int(x), int(y)), int(MARK_SIZE*3/4))
 
-	def evaluate(self, max_player):
-		""" metric evaluating game state """
-		your_pieces = game.tokens[max_player]
-		their_pieces = game.tokens[(max_player+1)%2]
-		return your_pieces - their_pieces
+def evaluate(game, max_player):
+	""" metric evaluating game state """
+	your_pieces = game.tokens[max_player]
+	their_pieces = game.tokens[(max_player+1)%2]
+	your_kings = game.kings[max_player]
+	their_kings = game.kings[(max_player+1)%2]
+	# print("EVAL", (your_pieces - their_pieces), your_pieces, their_pieces)
+	return your_pieces - their_pieces + 0.5*(your_kings - their_kings)
 
 # Helper functions:
 def get_clicked_column(mouse_pos):
@@ -246,49 +254,63 @@ def get_clicked_row(mouse_pos):
 			return i - 1
 	return COLS-1
 
-def minimax(game, depth, max_player, alpha=float('-inf'), beta=float('+inf')):
+def minimax(game, depth, max_player_index, alpha=float('-inf'), beta=float('+inf')):
 	"""	game: the game object holding game state
 	depth: how many moves ahead to search in the game tree
-	max_player: index of the player the computer is playing for
+	max_player_index: index of the player the computer is playing for
 	eval: evaluation of game state
 	best_move: the best move to make, given as [from_loc, to_loc, pieces_jumped]
 	"""
-	player = game.players[game.turn % 2] # player whose turn it is currently
-	if depth == 0 or game.check_winner() != None: # base case: depth reached/game over
-		return game.evaluate(max_player), None
+	player_index = game.turn % 2 # player whose turn it is currently
+	winner = game.check_winner()
+	if winner != None: # base case: game over
+		if winner == game.players[max_player_index]: # computer won
+			return float('+inf'), None, []
+		elif winner == game.players[(max_player_index + 1) % 2]:
+			return float('-inf'), None, []
+		else:
+			return evaluate(game, max_player_index), None, []
+	elif depth == 0: # base case: depth reached
+		eval = evaluate(game, max_player_index)
+		# print("eval", eval, "\ttokens", game.tokens)
+		return eval, None
 
-	elif max_player == player: # maximizing player's turn
+	elif max_player_index == player_index: # maximizing player's turn
 		max_eval = float('-inf')
 		best_move = None
-		for move in game.get_valid_moves(player):
+		moves = game.get_valid_moves(game.players[player_index])
+		for move in moves:
 			# make a copy of the game to play out the current move in
 			new_game = copy.deepcopy(game)
-			new_game.play(player, move[0], move[1], move[2], True)
-			eval = minimax(new_game, depth-1, max_player, alpha, beta)[0]
+			new_game.play(game.players[player_index], move[0], move[1], move[2], True)
+			eval = minimax(new_game, depth-1, max_player_index, alpha, beta)[0]
 			max_eval = max(max_eval, eval)
-			if max_eval == eval: # better value than previous best move
-				best_move = move
 			alpha = max(alpha, eval)
 			if beta <= alpha:
-				print("prune")
+				# print("\tprune")
 				break
+			if max_eval == eval: # better value than previous best move
+				best_move = move
+		# print("max_eval", max_eval, "\ttokens", game.tokens)
 		return max_eval, best_move
 
 	else: # minimizing player's turn
 		min_eval = float('+inf')
 		best_move = None
-		for move in game.get_valid_moves(player):
+		moves = game.get_valid_moves(game.players[player_index])
+		for move in moves:
 			# make a copy of the game to play out the current move in
 			new_game = copy.deepcopy(game)
-			new_game.play(player, move[0], move[1], move[2], True)
-			eval = minimax(new_game, depth-1, max_player, alpha, beta)[0]
+			new_game.play(game.players[player_index], move[0], move[1], move[2], True)
+			eval = minimax(new_game, depth-1, max_player_index, alpha, beta)[0]
 			min_eval = min(min_eval, eval)
-			if min_eval == eval: # better value than previous best move
-				best_move = move
 			beta = min(beta, eval)
 			if beta <= alpha:
-				print("prune")
+				# print("\tprune")
 				break
+			if min_eval == eval: # better value than previous best move
+				best_move = move
+		# print("min_eval", min_eval, "\ttokens", game.tokens)
 		return min_eval, best_move
 
 # game setup and constants
@@ -301,8 +323,8 @@ clock = pygame.time.Clock() # Used to manage how fast the screen updates
 framerate = 60
 
 # flip to false to play normal 2-player checkers
-run_minimax = False
-depth = 4 # How many moves ahead to look
+run_minimax = True
+depth = 5 # How many moves ahead to look
 max_player = 0 # play as red 'r' index 0
 
 while not done:
@@ -315,18 +337,14 @@ while not done:
 		print("EVALUATION:", eval)
 		print("BEST MOVE:", best_move)
 
-		# play the best move
-		# try:
-		game.play(game.players[game.turn % 2], best_move[0], best_move[1], best_move[2], True)
-		screen.fill(BLACK)
-		game.draw()
-		pygame.display.flip()
-		clock.tick(framerate)
-		print('Score', game.tokens, '\n')
-		# except:
-		# 	print("Stalemate :(")
-		# 	break
-		# time.sleep(1)
+		# check that no one won yet, so we know that best_move exists
+		winner = game.check_winner()
+		if winner != None:
+			self.status = 'game over'
+		else:
+			# play the best move
+			game.play(game.players[game.turn % 2], best_move[0], best_move[1], best_move[2], True)
+			print('Score', game.tokens, "\tKings", game.kings, '\n')
 
 	# if it's the human's turn
 	else:
