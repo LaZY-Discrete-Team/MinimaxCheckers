@@ -6,6 +6,7 @@
     <a href="https://github.com/brettpilch/pygame-checkers"> pygame-checkers</a>.
     Improved upon and explained by Lilo Heinrich, Zoë McGinnis, and Yehya Albakri, 
     Olin College of Engineering '23. <br />
+    <a href="https://sites.google.com/view/lazyy/home">See our website<br />
     <a href="https://repl.it/@Mickmcginnis/lazycheckers?lite=true">View Demo</a>
   </p>
 </p>
